@@ -8,9 +8,9 @@ import {
     equals,
     keys,
     length,
+    lt,
     not,
     prop,
-    propEq,
     reject,
 } from "ramda";
 /**
@@ -40,6 +40,12 @@ const isRed = equals("red");
 const isGreen = equals("green");
 const isBlue = equals("blue");
 const isOrange = equals("orange");
+
+const isNotOrange = compose(not, isOrange);
+const isNotWhite = compose(not, isWhite);
+const isNotGreen = compose(not, isGreen);
+const isNotBlue = compose(not, isBlue);
+const isNotRed = compose(not, isRed);
 
 const isWhiteTriangle = compose(isWhite, getTriangle);
 const isWhiteSquare = compose(isWhite, getCircle);
@@ -83,11 +89,9 @@ export const validateFieldN2 = (figures) => minTwoGreenFigure(figures);
 // 3. Количество красных фигур равно кол-ву синих.
 const checkLengthKeys = compose(length, keys);
 
-const isNotRed = compose(not, isRed);
 const rejectIsNotRed = reject(isNotRed);
 const checkCountRed = compose(checkLengthKeys, rejectIsNotRed);
 
-const isNotBlue = compose(not, isBlue);
 const rejectIsNotBlue = reject(isNotBlue);
 const checkCountBlue = compose(checkLengthKeys, rejectIsNotBlue);
 
@@ -121,14 +125,28 @@ const checkBlueCirRedStOrangeSq = allPass([
 export const validateFieldN4 = (figures) => checkBlueCirRedStOrangeSq(figures);
 
 // 5. Три фигуры одного любого цвета кроме белого (четыре фигуры одного цвета – это тоже true).
-export const validateFieldN5 = (figures) => {
-    return false;
-};
+// const rejectIsWhite = reject(isWhite);
+const checkCount = compose(checkLengthKeys, reject);
+const curryCheckCount = curry(checkCount);
+const countRed = curryCheckCount(isNotRed);
+const countOrange = curryCheckCount(isNotOrange);
+const countGreen = curryCheckCount(isNotGreen);
+const countBlue = curryCheckCount(isNotBlue);
+
+const lt2Red = compose(lt(2), countRed);
+const lt2Orange = compose(lt(2), countOrange);
+const lt2Green = compose(lt(2), countGreen);
+const lt2Blue = compose(lt(2), countBlue);
+const checkOnLessThen2 = anyPass([lt2Red, lt2Orange, lt2Green, lt2Blue]);
+
+export const validateFieldN5 = (figures) => checkOnLessThen2(figures);
 
 // 6. Ровно две зеленые фигуры (одна из зелёных – это треугольник), плюс одна красная. Четвёртая оставшаяся любого доступного цвета, но не нарушающая первые два условия
-export const validateFieldN6 = (figures) => {
-    return false;
-};
+const twoGreen = compose(equals(2), countGreen);
+const oneRed = compose(lt(0), countRed);
+
+export const validateFieldN6 = (figures) =>
+    allPass([twoGreen, isGreenTriangle, oneRed])(figures);
 
 // 7. Все фигуры оранжевые.
 const customEquals = (params, a, ...args) => {
@@ -149,8 +167,8 @@ const checkAllOrangeFigure = curryConverge(customEqualsToOrange)([
 export const validateFieldN7 = (figures) => checkAllOrangeFigure(figures);
 
 // 8. Не красная и не белая звезда, остальные – любого цвета.
-const isNotRedStar = compose(not, isRed, getStar);
-const isNotWhiteStar = compose(not, isWhite, getStar);
+const isNotRedStar = compose(isNotRed, getStar);
+const isNotWhiteStar = compose(isNotWhite, getStar);
 const isNotWhiteOrNotRedStar = allPass([isNotRedStar, isNotWhiteStar]);
 
 export const validateFieldN8 = (figures) => isNotWhiteOrNotRedStar(figures);
@@ -168,8 +186,8 @@ export const validateFieldN9 = (figures) => checkAllGreenFigure(figures);
 
 // 10. Треугольник и квадрат одного цвета (не белого), остальные – любого цвета
 
-const isNotWhiteTriangle = compose(not, isWhite, getTriangle);
-const isNotWhiteSquare = compose(not, isWhite, getSquare);
+const isNotWhiteTriangle = compose(isNotWhite, getTriangle);
+const isNotWhiteSquare = compose(isNotWhite, getSquare);
 const isEqualsColor = converge(equals, [getTriangle, getSquare]);
 
 const isEqualsColorAndWithoutWhite = allPass([
