@@ -104,10 +104,9 @@ const processSequence = (params) => {
     );
 
     const result = compose(
+        otherwise(handleError),
         andThen(handleSuccessResult),
-        otherwise(handleSuccessResult),
         resolvePipe,
-        otherwise(writeLogTapResult),
         getPipeNumber
     );
 
