@@ -20,22 +20,18 @@ import {
     always,
     andThen,
     applySpec,
-    applyTo,
+    call,
     compose,
     converge,
-    curry,
     gt,
-    gte,
-    identity,
     ifElse,
     length,
     lt,
     lte,
     modulo,
+    otherwise,
     partial,
     partialRight,
-    pick,
-    pipe,
     prop,
     tap,
     test,
@@ -44,69 +40,82 @@ import {
 import Api from "../tools/api";
 
 const api = new Api();
-const wait = (time) =>
-    new Promise((resolve) => {
-        setTimeout(resolve, time);
-    });
+const apiGet = api.get;
+const apiGetNumber = apiGet("https://api.tech/numbers/base");
 
-const apiGetNumber = api.get("https://api.tech/numbers/base");
+const getResult = prop("result");
+const getValue = prop("value");
+const getWriteLog = prop("writeLog");
 
 const less2AndGreat10 = allPass([gt(10), lt(2)]);
 const isPossitive = compose(lte(0), Number);
 const checkLength = compose(less2AndGreat10, length);
-const checkTrueFloat = test(/^\d+(\.\d+)?$/g);
+const isTrueFloatNumber = test(/^\d+(\.\d+)?$/g);
 
 const checkAllConditionValue = allPass([
     checkLength,
-    checkTrueFloat,
+    isTrueFloatNumber,
     isPossitive,
 ]);
 
-const validValue = (value) => checkAllConditionValue(value);
+const validValue = compose(checkAllConditionValue, getValue);
 
-const roundNumberAndToString = compose(String, Math.round, parseFloat);
+const roundNumberAndToString = compose(
+    String,
+    Math.round,
+    parseFloat,
+    getValue
+);
 
+const queryToNumber = applySpec({
+    from: always(10),
+    to: always(2),
+    number: roundNumberAndToString,
+});
+
+//power by 2
+const pow2 = partialRight(Math.pow, [2]);
+//modulo by 3
+const modulo3 = modulo(__, 3);
+//get TemplateStr
 const templateStr = (id) => `https://animals.tech/${id}`;
 
 const processSequence = (params) => {
-    /**
-     * Я – пример, удали меня
-     */
-    const { value, writeLog, handleSuccess, handleError } = params;
-
+    const { writeLog, handleSuccess, handleError } = params;
     const writeLogTap = tap(writeLog);
-    writeLogTap(value);
-    const query = applySpec({
-        from: always(10),
-        to: always(2),
-        number: roundNumberAndToString,
-    });
+    const handleErrorPartial = partial(handleError, ["ValidationError"]);
+    const tapGetValueAndWrite = tap(converge(call, [getWriteLog, getValue]));
 
-    //power by 2
-    const pow2 = converge(Math.pow, [compose(writeLogTap, length), always(2)]);
-    //modulo by 3
-    const modulo3 = modulo(__, 3);
+    const lengthResult = compose(length, getResult);
+    const getPipeNumber = compose(apiGetNumber, queryToNumber);
+    const handleSuccessResult = compose(handleSuccess, getResult);
+    const writeLogTapResult = tap(compose(writeLogTap, getResult));
 
-    const result = pipe(
-        query,
-        apiGetNumber,
-        andThen(prop("result")),
-        andThen(writeLogTap),
-        andThen(pow2),
+    const resolvePipe = compose(
+        andThen(partialRight(apiGet, [{}])),
+        andThen(templateStr),
         andThen(writeLogTap),
         andThen(modulo3),
         andThen(writeLogTap),
-        andThen(templateStr),
-        andThen(partialRight(api.get, [{}])),
-        andThen(prop("result")),
-        andThen(handleSuccess)
+        andThen(pow2),
+        andThen(writeLogTap),
+        andThen(lengthResult),
+        andThen(writeLogTapResult)
     );
 
-    const handleErrorPartial = partial(handleError, ["ValidationError"]);
+    const result = compose(
+        andThen(handleSuccessResult),
+        otherwise(handleSuccessResult),
+        resolvePipe,
+        otherwise(writeLogTapResult),
+        getPipeNumber
+    );
 
     const checkValid = ifElse(validValue, result, handleErrorPartial);
 
-    checkValid(value);
+    const app = compose(checkValid, tapGetValueAndWrite);
+
+    app(params);
 };
 
 export default processSequence;
