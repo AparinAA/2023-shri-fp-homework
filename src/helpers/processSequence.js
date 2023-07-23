@@ -14,6 +14,33 @@
  * Иногда промисы от API будут приходить в состояние rejected, (прямо как и API в реальной жизни)
  * Ответ будет приходить в поле {result}
  */
+import {
+    __,
+    allPass,
+    always,
+    andThen,
+    applySpec,
+    applyTo,
+    compose,
+    converge,
+    curry,
+    gt,
+    gte,
+    identity,
+    ifElse,
+    length,
+    lt,
+    lte,
+    modulo,
+    partial,
+    partialRight,
+    pick,
+    pipe,
+    prop,
+    tap,
+    test,
+} from "ramda";
+
 import Api from "../tools/api";
 
 const api = new Api();
@@ -22,34 +49,64 @@ const wait = (time) =>
         setTimeout(resolve, time);
     });
 
-const processSequence = ({ value, writeLog, handleSuccess, handleError }) => {
+const apiGetNumber = api.get("https://api.tech/numbers/base");
+
+const less2AndGreat10 = allPass([gt(10), lt(2)]);
+const isPossitive = compose(lte(0), Number);
+const checkLength = compose(less2AndGreat10, length);
+const checkTrueFloat = test(/^\d+(\.\d+)?$/g);
+
+const checkAllConditionValue = allPass([
+    checkLength,
+    checkTrueFloat,
+    isPossitive,
+]);
+
+const validValue = (value) => checkAllConditionValue(value);
+
+const roundNumberAndToString = compose(String, Math.round, parseFloat);
+
+const templateStr = (id) => `https://animals.tech/${id}`;
+
+const processSequence = (params) => {
     /**
      * Я – пример, удали меня
      */
-    writeLog(value);
+    const { value, writeLog, handleSuccess, handleError } = params;
 
-    api.get("https://api.tech/numbers/base", {
-        from: 2,
-        to: 10,
-        number: "01011010101",
-    }).then(({ result }) => {
-        writeLog(result);
+    const writeLogTap = tap(writeLog);
+    writeLogTap(value);
+    const query = applySpec({
+        from: always(10),
+        to: always(2),
+        number: roundNumberAndToString,
     });
 
-    wait(2500)
-        .then(() => {
-            writeLog("SecondLog");
+    //power by 2
+    const pow2 = converge(Math.pow, [compose(writeLogTap, length), always(2)]);
+    //modulo by 3
+    const modulo3 = modulo(__, 3);
 
-            return wait(1500);
-        })
-        .then(() => {
-            writeLog("ThirdLog");
+    const result = pipe(
+        query,
+        apiGetNumber,
+        andThen(prop("result")),
+        andThen(writeLogTap),
+        andThen(pow2),
+        andThen(writeLogTap),
+        andThen(modulo3),
+        andThen(writeLogTap),
+        andThen(templateStr),
+        andThen(partialRight(api.get, [{}])),
+        andThen(prop("result")),
+        andThen(handleSuccess)
+    );
 
-            return wait(400);
-        })
-        .then(() => {
-            handleSuccess("Done");
-        });
+    const handleErrorPartial = partial(handleError, ["ValidationError"]);
+
+    const checkValid = ifElse(validValue, result, handleErrorPartial);
+
+    checkValid(value);
 };
 
 export default processSequence;
