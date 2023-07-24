@@ -142,7 +142,7 @@ export const validateFieldN5 = checkOnLessThen2;
 
 // 6. Ровно две зеленые фигуры (одна из зелёных – это треугольник), плюс одна красная. Четвёртая оставшаяся любого доступного цвета, но не нарушающая первые два условия
 const twoGreen = compose(equals(2), countGreen);
-const oneRed = compose(lt(0), countRed);
+const oneRed = compose(equals(1), countRed);
 
 export const validateFieldN6 = allPass([twoGreen, isGreenTriangle, oneRed]);
 
