@@ -46,6 +46,7 @@ const apiGetNumber = apiGet("https://api.tech/numbers/base");
 const getResult = prop("result");
 const getValue = prop("value");
 const getWriteLog = prop("writeLog");
+const getNumber = prop("number");
 
 const less2AndGreat10 = allPass([gt(10), lt(2)]);
 const isPossitive = compose(lte(0), Number);
@@ -73,21 +74,30 @@ const queryToNumber = applySpec({
     number: roundNumberAndToString,
 });
 
+//get result and count length
+const lengthResult = compose(length, getResult);
 //power by 2
 const pow2 = partialRight(Math.pow, [2]);
 //modulo by 3
 const modulo3 = modulo(__, 3);
 //get TemplateStr
 const templateStr = (id) => `https://animals.tech/${id}`;
+//get value and writeLog to run
+const tapGetValueAndWrite = tap(converge(call, [getWriteLog, getValue]));
 
 const processSequence = (params) => {
     const { writeLog, handleSuccess, handleError } = params;
     const writeLogTap = tap(writeLog);
     const handleErrorPartial = partial(handleError, ["ValidationError"]);
-    const tapGetValueAndWrite = tap(converge(call, [getWriteLog, getValue]));
 
-    const lengthResult = compose(length, getResult);
-    const getPipeNumber = compose(apiGetNumber, queryToNumber);
+    //get number and write to run then tap prev data
+    const tapGetNumberAndWrite = tap(compose(writeLogTap, getNumber));
+
+    const getPipeNumber = compose(
+        apiGetNumber,
+        tapGetNumberAndWrite,
+        queryToNumber
+    );
     const handleSuccessResult = compose(handleSuccess, getResult);
     const writeLogTapResult = tap(compose(writeLogTap, getResult));
 
